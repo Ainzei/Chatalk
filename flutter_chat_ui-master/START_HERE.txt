@@ -1,0 +1,65 @@
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║     FLUTTER CHAT UI - HOW TO RUN                          ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
+
+
+📋 FIRST TIME SETUP (Do this once):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Make sure Flutter is installed on your computer
+   → Download from: https://flutter.dev/docs/get-started/install
+
+2. Double-click: setup.bat
+   → This will install everything you need
+
+3. The app will automatically launch in Microsoft Edge
+
+
+🚀 EASIEST WAY - ONE CLICK:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Double-click: START_APP.bat
+→ Choose: [1] Edge (web) or [2] Android Emulator
+
+OR
+
+Double-click: START_APP_ANDROID.bat
+→ Launches directly on Android Emulator
+
+
+🚀 ALTERNATIVE WAYS TO RUN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Double-click: run.bat (Edge only)
+• Or run: setup.bat (first time only)
+
+
+⌨️  KEYBOARD SHORTCUTS (while app is running):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+r  = Hot reload (apply changes instantly)
+R  = Hot restart (full restart)
+q  = Quit the app
+
+
+🔧 IF SOMETHING GOES WRONG:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option 1: Run setup.bat again
+
+Option 2: Open terminal in this folder and type:
+   flutter clean
+   flutter pub get
+   flutter run -d edge
+
+
+📚 MORE INFO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+→ See QUICKSTART.md for quick reference
+→ See README.md for full documentation
+
+
+That's it! Enjoy chatting! 💬
