@@ -256,9 +256,10 @@ class ChatScreenState extends State<ChatScreen> {
                       radius: 22.0,
                       backgroundImage: _avatarProvider(widget.user.id, widget.user.name),
                       backgroundColor: Colors.grey[300],
-                      child: !ProfilePhotoHelper.hasLocalPhoto(
+                      child: !ProfilePhotoHelper.hasProfilePhoto(
                         widget.user.id,
                         userName: widget.user.name,
+                        photoUrl: widget.user.photoUrl,
                       )
                           ? Text(
                               _initial(widget.user.name),

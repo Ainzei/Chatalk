@@ -68,9 +68,10 @@ class FriendRequestsSection extends StatelessWidget {
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundImage: imageProvider,
-                            child: !ProfilePhotoHelper.hasLocalPhoto(
+                            child: !ProfilePhotoHelper.hasProfilePhoto(
                               user.id,
                               userName: user.name,
+                              photoUrl: user.photoUrl,
                             )
                                 ? Text(
                                     user.name.isNotEmpty

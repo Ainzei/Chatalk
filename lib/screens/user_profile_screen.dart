@@ -48,9 +48,10 @@ class UserProfileScreen extends StatelessWidget {
                   radius: 60,
                   backgroundImage: imageProvider,
                   backgroundColor: const Color(0xFFFFE0B2),
-                  child: !ProfilePhotoHelper.hasLocalPhoto(
+                  child: !ProfilePhotoHelper.hasProfilePhoto(
                     user.id,
                     userName: user.name,
+                    photoUrl: user.photoUrl,
                   )
                       ? Text(
                           user.name.isNotEmpty

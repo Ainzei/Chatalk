@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/services/chat_service.dart';
 import 'package:flutter_chat_ui/models/app_user.dart';
-import 'package:flutter_chat_ui/utils/image_loader.dart';
+import 'package:flutter_chat_ui/utils/profile_photo_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -15,9 +15,6 @@ class ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _nicknameController;
   AppUser? _currentUser;
-  static const String _sandovalEmail = 'sandovalchristianace3206@gmail.com';
-  static const String _sandovalPfpPath =
-      'facebook-AceSandoval3206-2026-02-03-alN4NiXy/your_facebook_activity/messages/inbox/jeromefranzandjames_33543101728622614/photos/1585610535908571.jpg';
 
   @override
   void initState() {
@@ -95,26 +92,29 @@ class ProfileScreenState extends State<ProfileScreen> {
                       child: Stack(
                         children: [
                           CircleAvatar(
-                            radius: 90, // LARGER - was 60
-                            backgroundImage: _currentUser!.email == _sandovalEmail
-                                ? getImageProvider(_sandovalPfpPath)
-                                : _currentUser!.photoUrl.isNotEmpty
-                                    ? NetworkImage(_currentUser!.photoUrl)
-                                    : null,
-                            backgroundColor: const Color(0xFFFFE0B2),
-                            child: (_currentUser!.email == _sandovalEmail ||
-                                    _currentUser!.photoUrl.isNotEmpty)
-                                ? null
-                                : Text(
+                            radius: 90,
+                            backgroundColor: Colors.grey[300],
+                            backgroundImage: ProfilePhotoHelper.getProfileImage(
+                              _currentUser!.id,
+                              userName: _currentUser!.name,
+                              photoUrl: _currentUser!.photoUrl,
+                            ),
+                            child: !ProfilePhotoHelper.hasProfilePhoto(
+                              _currentUser!.id,
+                              userName: _currentUser!.name,
+                              photoUrl: _currentUser!.photoUrl,
+                            )
+                                ? Text(
                                     _currentUser!.name.isNotEmpty
                                         ? _currentUser!.name[0].toUpperCase()
                                         : '?',
                                     style: const TextStyle(
                                       color: Colors.black,
-                                      fontSize: 48, // Larger text too
+                                      fontSize: 48,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  ),
+                                  )
+                                : null,
                           ),
                           Positioned(
                             bottom: 0,

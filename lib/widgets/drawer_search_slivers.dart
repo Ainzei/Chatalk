@@ -2,6 +2,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_ui/services/chat_service.dart';
 import 'package:flutter_chat_ui/screens/chat_screen.dart';
+import 'package:flutter_chat_ui/screens/group_chat_screen.dart';
 import 'package:flutter_chat_ui/utils/profile_photo_helper.dart';
 
 List<Widget> buildDrawerSearchSlivers({
@@ -121,7 +122,7 @@ class _SearchBarHeaderDelegate extends SliverPersistentHeaderDelegate {
             padding: const WidgetStatePropertyAll<EdgeInsets>(
               EdgeInsets.symmetric(horizontal: 16.0),
             ),
-            hintText: 'Search users...',
+            hintText: 'Search users or groups...',
             onTap: controller.openView,
             onChanged: (_) => controller.openView(),
             leading: const Icon(Icons.search),
@@ -137,7 +138,7 @@ class _SearchBarHeaderDelegate extends SliverPersistentHeaderDelegate {
               const ListTile(
                 leading: Icon(Icons.search, color: Colors.grey),
                 title: Text(
-                  'Search for users by name or email',
+                  'Search for users or groups by name or email',
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
@@ -159,55 +160,118 @@ class _SearchBarHeaderDelegate extends SliverPersistentHeaderDelegate {
               .first
               .timeout(const Duration(seconds: 3));
 
-          // Filter by search query and exclude current user
-          final results = users.where((user) {
+          // Filter users by search query and exclude current user
+          final userResults = users.where((user) {
             if (user.id == currentUserId) return false;
             final nameMatch = user.name.toLowerCase().contains(query);
             final emailMatch = (user as dynamic).email?.toString().toLowerCase().contains(query) ?? false;
             return nameMatch || emailMatch;
           }).toList();
 
-          if (results.isEmpty) {
-            return [
-              const ListTile(
-                leading: Icon(Icons.person_off, color: Colors.grey),
-                title: Text(
-                  'No users found',
-                  style: TextStyle(color: Colors.grey),
+          // Get all group chats and filter
+          final groupChats = await chatService
+              .getAllGroupChats()
+              .first
+              .timeout(const Duration(seconds: 3));
+          
+          final currentUserGroups = groupChats.docs
+              .where((doc) {
+                final data = doc.data();
+                final members = List<String>.from(data['members'] ?? []);
+                return members.contains(currentUserId);
+              })
+              .toList();
+
+          final groupResults = currentUserGroups
+              .where((doc) {
+                final data = doc.data();
+                final groupName = (data['name'] ?? '').toString().toLowerCase();
+                return groupName.contains(query);
+              })
+              .toList();
+
+          // Build results list with headers
+          final List<Widget> results = [];
+
+          // Add user results with header
+          if (userResults.isNotEmpty) {
+            results.add(
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Users',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
                 ),
               ),
-            ];
-          }
-
-          return results.map((user) {
-            final isFriend = friends.contains(user.id);
-            final imageProvider = ProfilePhotoHelper.getProfileImage(
-              user.id,
-              userName: user.name,
-              photoUrl: user.photoUrl,
             );
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: imageProvider,
-                child: !ProfilePhotoHelper.hasLocalPhoto(
-                  user.id,
-                  userName: user.name,
-                )
-                    ? Text(
-                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+
+            results.addAll(userResults.map((user) {
+              final isFriend = friends.contains(user.id);
+              final imageProvider = ProfilePhotoHelper.getProfileImage(
+                user.id,
+                userName: user.name,
+                photoUrl: user.photoUrl,
+              );
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: imageProvider,
+                  child: !ProfilePhotoHelper.hasProfilePhoto(
+                    user.id,
+                    userName: user.name,
+                    photoUrl: user.photoUrl,
+                  )
+                      ? Text(
+                          user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
+                title: Text(user.name),
+                subtitle: Text(user.id),
+                trailing: isFriend
+                    ? IconButton(
+                        icon: const Icon(Icons.chat, color: Colors.orange),
+                        onPressed: () {
+                          controller.closeView(null);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(user: user),
+                            ),
+                          );
+                        },
                       )
-                    : null,
-              ),
-              title: Text(user.name),
-              subtitle: Text(user.id),
-              trailing: isFriend
-                  ? IconButton(
-                      icon: const Icon(Icons.chat, color: Colors.orange),
-                      onPressed: () {
+                    : IconButton(
+                        icon: const Icon(Icons.person_add, color: Colors.blue),
+                        onPressed: () async {
+                          try {
+                            await chatService.sendFriendRequest(user.id);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Friend request sent to ${user.name}'),
+                                ),
+                              );
+                              controller.closeView(null);
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to send request: $e')),
+                              );
+                            }
+                          }
+                        },
+                      ),
+                onTap: isFriend
+                    ? () {
                         controller.closeView(null);
                         Navigator.push(
                           context,
@@ -215,43 +279,83 @@ class _SearchBarHeaderDelegate extends SliverPersistentHeaderDelegate {
                             builder: (_) => ChatScreen(user: user),
                           ),
                         );
-                      },
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.person_add, color: Colors.blue),
-                      onPressed: () async {
-                        try {
-                          await chatService.sendFriendRequest(user.id);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Friend request sent to ${user.name}'),
-                              ),
-                            );
-                            controller.closeView(null);
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to send request: $e')),
-                            );
-                          }
-                        }
-                      },
-                    ),
-              onTap: isFriend
-                  ? () {
-                      controller.closeView(null);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatScreen(user: user),
-                        ),
-                      );
-                    }
-                  : null,
+                      }
+                    : null,
+              );
+            }).toList());
+          }
+
+          // Add group results with header
+          if (groupResults.isNotEmpty) {
+            results.add(
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Groups',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
             );
-          }).toList();
+
+            results.addAll(groupResults.map((groupDoc) {
+              final data = groupDoc.data();
+              final groupId = groupDoc.id;
+              final groupName = data['name'] ?? 'Unnamed Group';
+              final members = List<String>.from(data['members'] ?? []);
+
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.orange,
+                  child: Text(
+                    groupName.isNotEmpty ? groupName[0].toUpperCase() : 'G',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                title: Text(groupName),
+                subtitle: Text(
+                  '${members.length} members',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right, color: Colors.orange),
+                onTap: () {
+                  controller.closeView(null);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => GroupChatScreen(
+                        groupId: groupId,
+                        groupName: groupName,
+                        memberIds: members,
+                      ),
+                    ),
+                  );
+                },
+              );
+            }).toList());
+          }
+
+          // No results found
+          if (results.isEmpty) {
+            return [
+              const ListTile(
+                leading: Icon(Icons.search_off, color: Colors.grey),
+                title: Text(
+                  'No users or groups found',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            ];
+          }
+
+          return results;
         },
       ),
     );

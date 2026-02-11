@@ -216,9 +216,10 @@ class _HistoryChatTile extends StatelessWidget {
             radius: 18,
             backgroundColor: const Color(0xFFFFE0B2),
             backgroundImage: imageProvider,
-            child: !ProfilePhotoHelper.hasLocalPhoto(
+            child: !ProfilePhotoHelper.hasProfilePhoto(
               user.id,
               userName: user.name,
+              photoUrl: user.photoUrl,
             )
                 ? Text(
                     initialBuilder(user.name),

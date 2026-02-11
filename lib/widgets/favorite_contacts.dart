@@ -152,9 +152,10 @@ class _FavoriteContactsState extends State<FavoriteContacts> {
                                                       friend.name,
                                                       photoUrl: friend.photoUrl,
                                                     ),
-                                                child: !ProfilePhotoHelper.hasLocalPhoto(
+                                                child: !ProfilePhotoHelper.hasProfilePhoto(
                                                   friend.id,
                                                   userName: friend.name,
+                                                  photoUrl: friend.photoUrl,
                                                 )
                                                   ? Text(
                                                     _initial(_displayName(friend.name)),

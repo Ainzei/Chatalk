@@ -51,9 +51,10 @@ class _OnlineUsersState extends State<OnlineUsers> {
                   userName: user.name,
                   photoUrl: user.photoUrl,
                 ),
-                child: !ProfilePhotoHelper.hasLocalPhoto(
+                child: !ProfilePhotoHelper.hasProfilePhoto(
                   user.id,
                   userName: user.name,
+                  photoUrl: user.photoUrl,
                 )
                     ? Text(
                         user.name.isNotEmpty

@@ -350,7 +350,7 @@ class ChatScreenState extends State<ChatScreen> {
                 Navigator.pop(context);
                 if (!mounted) return;
                 await _chatService.pinMessage(widget.user.id, messageId);
-                if (!mounted) return;
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Message pinned')),
                 );
@@ -368,7 +368,7 @@ class ChatScreenState extends State<ChatScreen> {
                   messageId,
                   forEveryone: isMe,
                 );
-                if (!mounted) return;
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Message deleted')),
                 );
@@ -1247,21 +1247,19 @@ class ChatScreenState extends State<ChatScreen> {
               );
               if (!mounted) return;
               final localUid = _chatService.uidForUser(_chatService.currentUserId);
-              if (!mounted) return;
-              if (mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CallScreen(
-                      user: widget.user,
-                      isVideo: true,
-                      callId: call?['callId'],
-                      channelName: call?['channelName'],
-                      localUid: localUid,
-                    ),
+              if (!context.mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CallScreen(
+                    user: widget.user,
+                    isVideo: true,
+                    callId: call?['callId'],
+                    channelName: call?['channelName'],
+                    localUid: localUid,
                   ),
-                );
-              }
+                ),
+              );
             },
           ),
         ],

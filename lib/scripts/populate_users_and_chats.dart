@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
-import 'dart:io';
 
 /// Script to populate users and generate conversations
 /// Run this from your app after signing in as an admin
@@ -10,16 +9,16 @@ class PopulateUsersAndChats {
   static final Random _random = Random();
 
   static final List<Map<String, String>> users = [
-    {'email': 'sandovalchristianace3206@gmail.com', 'name': 'Christian Ace Sandoval', 'photo': ''},
+    {'email': 'sandovalchristianace3206@gmail.com', 'name': 'Christian Ace Sandoval', 'photo': 'assets/images/profiles/Christian.jpg'},
     {'email': 'james.berto@gmail.com', 'name': 'James Berto', 'photo': 'assets/images/profiles/JamesBerto.jpg'},
     {'email': 'franz.salazar@gmail.com', 'name': 'Franz Salazar', 'photo': 'assets/images/profiles/FranzSalazar.jpg'},
-    {'email': 'jerome.ruiz@gmail.com', 'name': 'Jerome Ruiz', 'photo': ''},
-    {'email': 'michael.aquino@gmail.com', 'name': 'Michael Aquino', 'photo': ''},
+    {'email': 'jerome.ruiz@gmail.com', 'name': 'Jerome Ruiz', 'photo': 'assets/images/profiles/Jerome.jpg'},
+    {'email': 'michael.aquino@gmail.com', 'name': 'Michael Aquino', 'photo': 'assets/images/profiles/Michael.jpg'},
     {'email': 'jian.ceruelas@gmail.com', 'name': 'Jian Ceruelas', 'photo': 'assets/images/profiles/JianCeruelas.jpg'},
     {'email': 'paolo.martinez@gmail.com', 'name': 'Paolo Martinez', 'photo': 'assets/images/profiles/PaoloMartinez.jpg'},
     {'email': 'enrico.reprima@gmail.com', 'name': 'Enrico Reprima', 'photo': 'assets/images/profiles/EnricoReprima.jpg'},
     {'email': 'nicole.aldea@gmail.com', 'name': 'Nicole Aldea', 'photo': 'assets/images/profiles/NicoleAldea.jpg'},
-    {'email': 'allyxis.cortez@gmail.com', 'name': 'Allyxis Cortez', 'photo': ''},
+    {'email': 'allyxis.cortez@gmail.com', 'name': 'Allyxis Cortez', 'photo': 'assets/images/profiles/Allyxis.jpg'},
     {'email': 'trisha.dudas@gmail.com', 'name': 'Trisha Dudas', 'photo': 'assets/images/profiles/TrishaDudas.jpg'},
   ];
 
@@ -45,24 +44,15 @@ class PopulateUsersAndChats {
   static Future<void> addUsersToFirestore() async {
     debugPrint('📝 Adding users to Firestore...\n');
     
-    // Get the base path for profile pictures
-    final baseDir = Directory.current.path;
-    
     for (var i = 0; i < users.length; i++) {
       final user = users[i];
       // Generate a fake UID (in real scenario, these would be created via Auth)
       final uid = 'user_${i}_${user['email']!.split('@')[0]}';
       
-      // Construct full path for photo if it exists
+      // Use asset path directly from the photo list
       String? photoUrl;
       if (user['photo']!.isNotEmpty) {
-        photoUrl = '$baseDir\\${user['photo']}';
-        // Check if file exists
-        final photoFile = File(photoUrl);
-        if (!photoFile.existsSync()) {
-          debugPrint("   ⚠️  Photo not found: ${user['photo']}");
-          photoUrl = null;
-        }
+        photoUrl = user['photo']!;
       }
       
       await _firestore.collection('users').doc(uid).set({
@@ -76,7 +66,7 @@ class PopulateUsersAndChats {
       });
       
       final photoStatus = photoUrl != null ? '📷' : '👤';
-      debugPrint('✓ $photoStatus Added: ${user["name"]} (${user["email"]})');
+      debugPrint('✓ $photoStatus Added: ${user["name"]} (${user["email"]})  ${photoUrl ?? "(no photo)"}');
     }
     
     debugPrint('\n✅ All users added!\n');

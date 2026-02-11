@@ -1,17 +1,19 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter_chat_ui/models/message_model.dart';
-import 'package:flutter_chat_ui/models/user_model.dart';
-import 'package:flutter_chat_ui/utils/image_loader.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_chat_ui/services/chat_service.dart';
-import 'package:flutter_chat_ui/widgets/groups.dart';
 
 class GroupChatScreen extends StatefulWidget {
-  final dynamic group; // keep flexible
+  final String groupId;
+  final String groupName;
+  final List<String> memberIds;
 
-  const GroupChatScreen({Key? key, required this.group}) : super(key: key);
+  const GroupChatScreen({
+    Key? key,
+    required this.groupId,
+    required this.groupName,
+    required this.memberIds,
+  }) : super(key: key);
 
   @override
   GroupChatScreenState createState() => GroupChatScreenState();
@@ -19,28 +21,85 @@ class GroupChatScreen extends StatefulWidget {
 
 class GroupChatScreenState extends State<GroupChatScreen> {
   final TextEditingController _controller = TextEditingController();
+  final ChatService _chatService = ChatService();
+  Map<String, String> _userNameCache = {};
+  bool _isLoading = true;
 
-  void _leaveGroup(BuildContext context) {
+  @override
+  void initState() {
+    super.initState();
+    _loadUserNames();
+  }
+
+  Future<void> _loadUserNames() async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final cache = <String, String>{};
+
+      for (final userId in widget.memberIds) {
+        try {
+          final doc = await firestore.collection('users').doc(userId).get();
+          if (doc.exists) {
+            final data = doc.data() ?? {};
+            cache[userId] = (data['name'] ?? 'Unknown').toString();
+          }
+        } catch (e) {
+          debugPrint('Error loading user name for $userId: $e');
+          cache[userId] = 'Unknown';
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _userNameCache = cache;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error in _loadUserNames: $e');
+      // Set loading to false anyway so screen shows
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _leaveGroup() async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Leave Group'),
-        content: Text('Are you sure you want to leave ${widget.group.name}?'),
+        content: Text('Are you sure you want to leave ${widget.groupName}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              // Remove from globalGroups
-              globalGroups.removeWhere((g) => g.name == widget.group.name);
-              
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to home
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Left ${widget.group.name}')),
-              );
+            onPressed: () async {
+              try {
+                await _chatService.removeGroupMember(
+                  widget.groupId,
+                  _chatService.currentUserId,
+                );
+                if (mounted) {
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close dialog
+                    Navigator.pop(context); // Go back
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Left ${widget.groupName}')),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error leaving group: $e')),
+                    );
+                  }
+                }
+              }
             },
             child: const Text('Leave', style: TextStyle(color: Colors.red)),
           ),
@@ -49,35 +108,219 @@ class GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
-  String _initial(String name) {
+  String _getInitial(String name) {
     final trimmed = name.trim();
     return trimmed.isEmpty ? '?' : trimmed[0].toUpperCase();
   }
 
-  String _getGcId(String name) {
-    // Match the ID generation from import_gc_photos.py
-    String slugify(String s) {
-      s = s.toLowerCase();
-      s = s.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-      s = s.replaceAll(RegExp(r'_+'), '_');
-      s = s.replaceAll(RegExp(r'^_|_$'), '');
-      return s.isEmpty ? 'group' : s;
-    }
+  void _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
 
-    int stableHash(String text) {
-      int h = 5381;
-      for (int i = 0; i < text.length; i++) {
-        h = ((h << 5) + h) + text.codeUnitAt(i);
-        h = h & 0x7fffffff;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final senderName =
+        _userNameCache[currentUser.uid] ?? currentUser.displayName ?? 'Anonymous';
+
+    _controller.clear();
+
+    try {
+      await _chatService.sendGroupMessage(
+        groupId: widget.groupId,
+        senderId: currentUser.uid,
+        senderName: senderName,
+        text: text,
+        type: 'text',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending message: $e')),
+        );
       }
-      return h;
     }
-
-    return "gc_${slugify(name)}_${stableHash(name)}";
   }
 
-  Widget _buildMessage(String text, String time, bool isMe,
-      {String? senderName, String? senderImageUrl}) {
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return PopScope(
+        canPop: true,
+        onPopInvokedWithResult: (didPop, result) {
+          debugPrint('User navigated back from loading screen');
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Loading...'),
+            automaticallyImplyLeading: true,
+          ),
+          body: const Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        debugPrint('Leaving group chat: ${widget.groupId}');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.groupName),
+              Text(
+                '${widget.memberIds.length} members',
+                style: const TextStyle(fontSize: 12.0),
+              ),
+            ],
+          ),
+          actions: [
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'leave') {
+                  _leaveGroup();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'leave',
+                  child: Row(
+                    children: [
+                      Icon(Icons.exit_to_app, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Leave Group', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      body: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _chatService.groupMessagesStream(widget.groupId),
+              builder: (context, snapshot) {
+                // Handle errors
+                if (snapshot.hasError) {
+                  debugPrint('Error loading messages: ${snapshot.error}');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error, color: Colors.red, size: 48),
+                        const SizedBox(height: 16),
+                        const Text('Error loading messages'),
+                        const SizedBox(height: 8),
+                        Text(
+                          snapshot.error.toString(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final messages = snapshot.data?.docs ?? [];
+
+                if (messages.isEmpty) {
+                  return const Center(
+                    child: Text('No messages yet. Start chatting!'),
+                  );
+                }
+
+                return ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.all(12.0),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final msgDoc = messages[index];
+                    final msgData = msgDoc.data();
+                    final senderId = msgData['senderId'] ?? '';
+                    final senderName = msgData['senderName'] ?? 'Unknown';
+                    final text = msgData['text'] ?? '';
+                    final timestamp = msgData['createdAt'] as Timestamp?;
+                    final isMe = senderId == FirebaseAuth.instance.currentUser?.uid;
+
+                    final timeString = timestamp != null
+                        ? _formatTime(timestamp.toDate())
+                        : 'Now';
+
+                    return _buildMessageTile(
+                      text: text,
+                      senderName: senderName,
+                      time: timeString,
+                      isMe: isMe,
+                      senderId: senderId,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      hintText: 'Message...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                    ),
+                    minLines: 1,
+                    maxLines: 3,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FloatingActionButton(
+                  onPressed: _sendMessage,
+                  mini: true,
+                  backgroundColor: const Color(0xFFF57C00),
+                  child: const Icon(Icons.send, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildMessageTile({
+    required String text,
+    required String senderName,
+    required String time,
+    required bool isMe,
+    required String senderId,
+  }) {
     final bubble = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       decoration: BoxDecoration(
@@ -109,80 +352,6 @@ class GroupChatScreenState extends State<GroupChatScreen> {
       ),
     );
 
-    return _buildMessageRow(
-      isMe: isMe,
-      senderName: senderName,
-      senderImageUrl: senderImageUrl,
-      bubble: bubble,
-    );
-  }
-
-  Widget _buildMessageRow({
-    required bool isMe,
-    required Widget bubble,
-    String? senderName,
-    String? senderImageUrl,
-  }) {
-    final displayName = (senderName ?? '').isNotEmpty
-        ? senderName!
-        : isMe
-            ? 'You'
-            : 'Member';
-    final avatarUrl = isMe ? (senderImageUrl ?? '') : '';
-
-    final avatar = GestureDetector(
-      onTap: () {
-        // Note: Group chat users are mock data with integer IDs, not Firebase users
-        // So we don't navigate to profile for them
-        if (!isMe && senderName != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$senderName is a demo group chat user'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      },
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: const Color(0xFFFFE0B2),
-        backgroundImage: avatarUrl.isNotEmpty ? getImageProvider(avatarUrl) : null,
-        child: avatarUrl.isEmpty
-            ? Text(
-                _initial(displayName),
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            : null,
-      ),
-    );
-
-    final content = Column(
-      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        if (displayName.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4.0, left: 2.0, right: 2.0),
-            child: Text(
-              displayName,
-              style: const TextStyle(
-                color: Colors.black54,
-                fontSize: 11.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.65,
-          ),
-          child: bubble,
-        ),
-      ],
-    );
-
     return Padding(
       padding: EdgeInsets.only(
         top: 6.0,
@@ -196,231 +365,62 @@ class GroupChatScreenState extends State<GroupChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: isMe
             ? [
-                Flexible(child: content),
+                Flexible(child: bubble),
                 const SizedBox(width: 8.0),
-                avatar,
               ]
             : [
-                avatar,
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: const Color(0xFFFFE0B2),
+                  child: Text(
+                    _getInitial(senderName),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8.0),
-                Flexible(child: content),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        senderName,
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 11.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4.0),
+                      bubble,
+                    ],
+                  ),
+                ),
               ],
       ),
     );
   }
 
-  void _sendMessage() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    
-    final fbUser = firebase_auth.FirebaseAuth.instance.currentUser;
-    if (fbUser == null) return;
-    
-    final senderName = fbUser.displayName ?? fbUser.email ?? 'Anonymous';
-    
-    // Add message locally for immediate UI update (use currentUser constant from Message model)
-    final m = Message(
-        sender: const User(
-          id: 0,
-          name: 'Me',
-          imageUrl: 'assets/images/profile.jpg',
-        ),
-        time: 'Now',
-        text: text,
-        isLiked: false,
-        unread: false);
-    setState(() {
-      widget.group.addMessage(m); // Use addMessage to update lastMessageAt
-      _controller.clear();
-    });
-    
-    // Save to database with proper timestamp
-    try {
-      await ChatService().sendGroupMessage(
-        groupId: widget.group.id,
-        senderId: fbUser.uid,
-        senderName: senderName,
-        text: text,
-        type: 'text',
-      );
-    } catch (e) {
-      debugPrint('Error saving group message: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error sending message')),
-      );
+  String _formatTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final msgDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    if (msgDate == today) {
+      return '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else if (msgDate == yesterday) {
+      return 'Yesterday ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } else {
+      return '${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final group = widget.group;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(group.name),
-            Text('${group.members.length} members',
-                style: const TextStyle(fontSize: 12.0)),
-          ],
-        ),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'leave') {
-                _leaveGroup(context);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'leave',
-                child: Row(
-                  children: [
-                    Icon(Icons.exit_to_app, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Leave Group', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: <Widget>[
-          const SizedBox(height: 10.0),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 10.0,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.all(3.0),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFF57C00),
-                        width: 2.0,
-                      ),
-                    ),
-                    child: StreamBuilder<DocumentSnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('group_chats')
-                          .doc(_getGcId(widget.group.name))
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        ImageProvider? backgroundImage;
-                        if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
-                          try {
-                            final data = snapshot.data!.data() as Map<String, dynamic>?;
-                            final photoUrl = data?['photoUrl'] as String?;
-                            if (photoUrl != null && photoUrl.isNotEmpty) {
-                              if (photoUrl.startsWith('/') || photoUrl.contains(':')) {
-                                try {
-                                  backgroundImage = FileImage(File(photoUrl));
-                                } catch (e) {
-                                  backgroundImage = null;
-                                }
-                              } else {
-                                backgroundImage = NetworkImage(photoUrl);
-                              }
-                            }
-                          } catch (e) {
-                            // Field doesn't exist, ignore
-                            backgroundImage = null;
-                          }
-                        }
-                        return CircleAvatar(
-                          radius: 22.0,
-                          backgroundColor: Colors.grey[300],
-                          backgroundImage: backgroundImage,
-                          child: backgroundImage == null
-                              ? Text(
-                                  _initial(widget.group.name),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8.0),
-                  Text(
-                    group.name,
-                    style: const TextStyle(
-                      fontSize: 16.0,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 2.0),
-                  Text(
-                    '${group.members.length} members',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12.0),
-              itemCount: group.messages.length,
-              itemBuilder: (context, index) {
-                final Message message = group.messages[index];
-                final bool isMe = message.sender.id == currentUser.id;
-                return _buildMessage(
-                  message.text,
-                  message.time,
-                  isMe,
-                  senderName: message.sender.name,
-                  senderImageUrl: message.sender.imageUrl,
-                );
-              },
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            color: Colors.white,
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: const InputDecoration.collapsed(
-                        hintText: 'Send a message...'),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 }

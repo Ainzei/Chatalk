@@ -43,20 +43,18 @@ class _StoriesState extends State<Stories> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
       child: Material(
         color: Colors.white,
         elevation: 6.0,
         shadowColor: Colors.black26,
         borderRadius: BorderRadius.circular(16.0),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: StreamBuilder(
-            stream: _chatService.currentUserDocStream(),
-            builder: (context, currentUserSnapshot) {
-              final data = currentUserSnapshot.data?.data();
-              final stories = List<String>.from(data?['stories'] ?? const []);
-              final currentUserName = (data?['name'] ?? 'Your').toString();
+        child: StreamBuilder(
+          stream: _chatService.currentUserDocStream(),
+          builder: (context, currentUserSnapshot) {
+            final data = currentUserSnapshot.data?.data();
+            final stories = List<String>.from(data?['stories'] ?? const []);
+            final currentUserName = (data?['name'] ?? 'Your').toString();
 
               return StreamBuilder<AppUser?>(
                 stream: _chatService.currentUserDocStream().asyncMap(
@@ -79,14 +77,19 @@ class _StoriesState extends State<Stories> {
                           .where((u) => stories.contains(u.id))
                           .toList();
 
-                      return Column(
-                        children: <Widget>[
-                          SizedBox(
-                            height: 110.0, // LARGER - was 86.0
-                            child: ListView.builder(
-                              padding: const EdgeInsets.only(left: 8.0),
-                              scrollDirection: Axis.horizontal,
-                              itemCount: 1 + filtered.length, // +1 for "Your Story"
+                      return ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: 105.0,
+                          maxWidth: MediaQuery.of(context).size.width * 0.95,
+                        ),
+                        child: Column(
+                          children: <Widget>[
+                            SizedBox(
+                              height: 85.0,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.only(left: 8.0),
+                                scrollDirection: Axis.horizontal,
+                                itemCount: 1 + filtered.length, // +1 for "Your Story"
                               itemBuilder: (BuildContext context, int index) {
                                 // First item is "Your Story"
                                 if (index == 0) {
@@ -105,7 +108,7 @@ class _StoriesState extends State<Stories> {
                                                 ),
                                               ),
                                               child: CircleAvatar(
-                                                radius: 30.0, // LARGER - was 22.0
+                                                radius: 20.0,
                                                 backgroundImage: currentUser != null
                                                     ? _avatarProvider(
                                                         currentUser.id,
@@ -113,19 +116,13 @@ class _StoriesState extends State<Stories> {
                                                         photoUrl: currentUser.photoUrl,
                                                       )
                                                     : null,
-                                                child: currentUser == null ||
-                                                        !ProfilePhotoHelper.hasLocalPhoto(
-                                                          currentUser.id,
-                                                          userName: currentUser.name,
-                                                        )
-                                                    ? Text(
-                                                        _initial(currentUserName),
-                                                        style: const TextStyle(
-                                                          color: Colors.white,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      )
-                                                    : null,
+                                                child: Text(
+                                                  _initial(currentUserName),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                             Positioned(
@@ -203,25 +200,20 @@ class _StoriesState extends State<Stories> {
                                             ),
                                             padding: const EdgeInsets.all(2),
                                             child: CircleAvatar(
-                                              radius: 28.0, // LARGER - was 20.0
+                                              radius: 18.0,
                                               backgroundImage: _avatarProvider(
                                                 friend.id,
                                                 friend.name,
                                                 photoUrl: friend.photoUrl,
                                               ),
-                                              child: !ProfilePhotoHelper.hasLocalPhoto(
-                                                friend.id,
-                                                userName: friend.name,
-                                              )
-                                                  ? Text(
-                                                      _initial(_displayName(friend.name)),
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 12,
-                                                      ),
-                                                    )
-                                                  : null,
+                                              child: Text(
+                                                _initial(_displayName(friend.name)),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -248,6 +240,7 @@ class _StoriesState extends State<Stories> {
                             ),
                           ),
                         ],
+                        ),
                       );
                     },
                   );
@@ -256,7 +249,6 @@ class _StoriesState extends State<Stories> {
             },
           ),
         ),
-      ),
-    );
+      );
   }
 }

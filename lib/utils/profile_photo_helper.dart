@@ -53,6 +53,10 @@ class ProfilePhotoHelper {
     'trishadudas': 'TrishaDudas',
     'trisha dudas': 'TrishaDudas',
     'trisha.dudas': 'TrishaDudas',
+    'Trisha Leigh Dudas': 'TrishaDudas',
+    'trisha leigh dudas': 'TrishaDudas',
+    'Trisha': 'TrishaDudas',
+    'trisha': 'TrishaDudas',
   };
   
   /// Try to match a username to an available profile picture
@@ -214,6 +218,25 @@ class ProfilePhotoHelper {
           return true;
         }
       }
+    }
+    
+    return false;
+  }
+
+  /// Check if a user has any profile photo (local or network URL)
+  static bool hasProfilePhoto(
+    String userId, {
+    String? userName,
+    String? photoUrl,
+  }) {
+    // Check for local photo first
+    if (hasLocalPhoto(userId, userName: userName)) {
+      return true;
+    }
+    
+    // Check for network photo URL
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return true;
     }
     
     return false;

@@ -6,7 +6,7 @@ import 'package:flutter_chat_ui/widgets/recent_chats.dart';
 import 'package:flutter_chat_ui/widgets/history_section.dart';
 import 'package:flutter_chat_ui/widgets/online_users.dart';
 import 'package:flutter_chat_ui/widgets/friends_section.dart';
-import 'package:flutter_chat_ui/widgets/groups_section.dart';
+import 'package:flutter_chat_ui/widgets/groups.dart';
 import 'package:flutter_chat_ui/widgets/drawer_search_slivers.dart';
 import 'package:flutter_chat_ui/utils/profile_photo_helper.dart';
 import 'package:flutter_chat_ui/services/chat_service.dart';
@@ -21,7 +21,7 @@ class HomeScreen extends StatefulWidget {
   HomeScreenState createState() => HomeScreenState();
 }
 
-class HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedCategory = 0; // 0=Messages,1=Online,2=Groups,3=Friends,4=History
   double _panelHeight = _panelMaxHeight;
   static const double _panelMinHeight = 0.0;
@@ -31,8 +31,34 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Add observer for app lifecycle
+    WidgetsBinding.instance.addObserver(this);
     // Repair any chats missing lastMessageAt timestamp
     _chatService.repairChatsTimestamps();
+    // Set user as online when they open the app
+    _chatService.setUserOnline();
+  }
+
+  @override
+  void dispose() {
+    // Remove observer
+    WidgetsBinding.instance.removeObserver(this);
+    // Set user as offline when they close the app
+    _chatService.setUserOffline();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      // App went to background or closed
+      _chatService.setUserOffline();
+    } else if (state == AppLifecycleState.resumed) {
+      // App came back to foreground
+      _chatService.setUserOnline();
+    }
   }
 
   void _handlePanelDragUpdate(DragUpdateDetails details) {
@@ -161,16 +187,6 @@ class HomeScreenState extends State<HomeScreen> {
                         setState(() => _selectedCategory = 3);
                       },
                     ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.archive_outlined, color: Colors.black),
-                      title: const Text('Archive'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.pop(context);
-                        setState(() => _selectedCategory = 5);
-                      },
-                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -183,6 +199,16 @@ class HomeScreenState extends State<HomeScreen> {
                       onTap: () {
                         Navigator.pop(context);
                         setState(() => _selectedCategory = 4);
+                      },
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.archive_outlined, color: Colors.black),
+                      title: const Text('Archive'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.pop(context);
+                        setState(() => _selectedCategory = 5);
                       },
                     ),
                   ],
@@ -328,7 +354,8 @@ class HomeScreenState extends State<HomeScreen> {
       case 4:
         return const HistorySection();
       default:
-        return const RecentChats();
+        // Messages tab: Show Recent Chats on top, Groups below
+        return const MessagesTabContent();
     }
   }
 }
@@ -392,6 +419,28 @@ class _DrawerCard extends StatelessWidget {
               ),
             )
             .toList(),
+      ),
+    );
+  }
+}
+
+class MessagesTabContent extends StatelessWidget {
+  const MessagesTabContent({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Recent Chats Section
+          RecentChats(),
+          // Groups Section with spacing
+          Padding(
+            padding: EdgeInsets.only(top: 8.0),
+            child: GroupsSection(),
+          ),
+        ],
       ),
     );
   }

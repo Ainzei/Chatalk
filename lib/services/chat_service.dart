@@ -1477,6 +1477,84 @@ class ChatService {
     }, SetOptions(merge: true));
   }
 
+  /// Create a new group chat
+  Future<String> createGroupChat({
+    required String groupName,
+    required List<String> memberIds,
+  }) async {
+    try {
+      if (groupName.trim().isEmpty || memberIds.isEmpty) {
+        throw Exception('Group name and members are required');
+      }
+
+      // Ensure current user is included
+      final currentUserId = this.currentUserId;
+      final allMembers = {...memberIds, currentUserId}.toList();
+
+      if (allMembers.length < 2) {
+        throw Exception('A group must have at least 2 members');
+      }
+
+      // Create document with auto ID
+      final docRef = _firestore.collection('group_chats').doc();
+      final groupId = docRef.id;
+
+      await docRef.set({
+        'name': groupName.trim(),
+        'members': allMembers,
+        'createdBy': currentUserId,
+        'createdAt': serverTimestamp,
+        'lastMessage': '',
+        'lastMessageAt': serverTimestamp,
+        'lastSenderId': '',
+        'lastSenderName': '',
+        'description': '',
+      });
+
+      return groupId;
+    } catch (e) {
+      debugPrint('Error creating group: $e');
+      rethrow;
+    }
+  }
+
+  /// Add a member to a group
+  Future<void> addGroupMember(String groupId, String userId) async {
+    try {
+      await _firestore.collection('group_chats').doc(groupId).update({
+        'members': FieldValue.arrayUnion([userId]),
+      });
+    } catch (e) {
+      debugPrint('Error adding member: $e');
+      rethrow;
+    }
+  }
+
+  /// Remove a member from a group
+  Future<void> removeGroupMember(String groupId, String userId) async {
+    try {
+      await _firestore.collection('group_chats').doc(groupId).update({
+        'members': FieldValue.arrayRemove([userId]),
+      });
+    } catch (e) {
+      debugPrint('Error removing member: $e');
+      rethrow;
+    }
+  }
+
+  /// Get a single group
+  Future<DocumentSnapshot<Map<String, dynamic>>> getGroupChat(String groupId) {
+    return _firestore.collection('group_chats').doc(groupId).get();
+  }
+
+  /// Get all group chats
+  Stream<QuerySnapshot<Map<String, dynamic>>> getAllGroupChats() {
+    return _firestore
+        .collection('group_chats')
+        .orderBy('lastMessageAt', descending: true)
+        .snapshots();
+  }
+
   /// Get messages stream for a group
   Stream<QuerySnapshot<Map<String, dynamic>>> groupMessagesStream(
     String groupId, {
@@ -1496,11 +1574,62 @@ class ChatService {
     if (userId.isEmpty) {
       return const Stream.empty();
     }
+    // Query without orderBy to avoid requiring composite index
+    // Sorting will be done in the GroupsSection widget
     return _firestore
         .collection('group_chats')
         .where('members', arrayContains: userId)
-        .orderBy('lastMessageAt', descending: true)
         .snapshots();
+  }
+
+  /// Set user as online
+  Future<void> setUserOnline() async {
+    try {
+      final userId = currentUserId;
+      if (userId.isEmpty) return;
+      
+      await _firestore.collection('users').doc(userId).update({
+        'isOnline': true,
+      });
+    } catch (e) {
+      debugPrint('Error setting user online: $e');
+    }
+  }
+
+  /// Set user as offline
+  Future<void> setUserOffline() async {
+    try {
+      final userId = currentUserId;
+      if (userId.isEmpty) return;
+      
+      await _firestore.collection('users').doc(userId).update({
+        'isOnline': false,
+      });
+    } catch (e) {
+      debugPrint('Error setting user offline: $e');
+    }
+  }
+
+  /// Update user profile information
+  Future<void> updateUserProfile({
+    String? nickname,
+    String? photoUrl,
+  }) async {
+    try {
+      final userId = currentUserId;
+      if (userId.isEmpty) return;
+      
+      final updates = <String, dynamic>{};
+      if (nickname != null) updates['nickname'] = nickname;
+      if (photoUrl != null) updates['photoUrl'] = photoUrl;
+      
+      if (updates.isNotEmpty) {
+        await _firestore.collection('users').doc(userId).update(updates);
+        _currentUserCache = null; // Clear cache to force reload
+      }
+    } catch (e) {
+      debugPrint('Error updating user profile: $e');
+    }
   }
 }
 

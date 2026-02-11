@@ -134,7 +134,7 @@ class _RecentChatsState extends State<RecentChats> {
                     padding: EdgeInsets.all(24.0),
                     child: Center(
                       child: Text(
-                        'No chats yet',
+                        'No messages yet',
                         style: TextStyle(color: Colors.blueGrey),
                       ),
                     ),
@@ -152,9 +152,26 @@ class _RecentChatsState extends State<RecentChats> {
                     }
 
                     final users = usersSnapshot.data!;
+                    final currentUserId = _chatService.currentUserId;
                     
-                    // Filter out chats where user doesn't exist and archived chats
-                    final validChats = chats.where((c) => users.containsKey(c.otherUserId) && !c.isArchived).toList();
+                    // Filter out chats where user doesn't exist, archived chats, and chats where we sent the last message
+                    final validChats = chats.where((c) => 
+                      users.containsKey(c.otherUserId) && 
+                      !c.isArchived &&
+                      c.lastSenderId != currentUserId  // Only show chats where the other person sent the last message
+                    ).toList();
+                    
+                    if (validChats.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24.0),
+                        child: Center(
+                          child: Text(
+                            'No new messages',
+                            style: TextStyle(color: Colors.blueGrey),
+                          ),
+                        ),
+                      );
+                    }
                     
                     // Create list of chats with their data
                     final List<dynamic> chatItems = [];
@@ -286,9 +303,10 @@ class _RecentChatsState extends State<RecentChats> {
                 photoUrl: user.photoUrl,
               ),
               backgroundColor: Colors.grey[300],
-              child: !ProfilePhotoHelper.hasLocalPhoto(
+              child: !ProfilePhotoHelper.hasProfilePhoto(
                 user.id,
                 userName: user.name,
+                photoUrl: user.photoUrl,
               )
                   ? Text(
                       _initial(user.name),

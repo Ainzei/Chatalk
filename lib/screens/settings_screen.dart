@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_chat_ui/services/chat_service.dart';
 import 'package:flutter_chat_ui/models/app_user.dart';
-import 'package:flutter_chat_ui/utils/image_loader.dart';
+import 'package:flutter_chat_ui/utils/profile_photo_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -13,11 +14,8 @@ class SettingsScreen extends StatefulWidget {
 class SettingsScreenState extends State<SettingsScreen> {
   final ChatService _chatService = ChatService();
   AppUser? _currentUser;
-  bool _isDarkMode = false;
   bool _isActiveStatus = false;
-  static const String _sandovalEmail = 'sandovalchristianace3206@gmail.com';
-  static const String _sandovalPfpPath =
-      'facebook-AceSandoval3206-2026-02-03-alN4NiXy/your_facebook_activity/messages/inbox/jeromefranzandjames_33543101728622614/photos/1585610535908571.jpg';
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
@@ -35,12 +33,52 @@ class SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _showChangeUsernameDialog() {
+    final controller = TextEditingController()
+      ..text = _currentUser?.nickname ?? '';
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Username'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter new username',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (controller.text.isNotEmpty) {
+                await _chatService.updateUserProfile(
+                  nickname: controller.text,
+                );
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Username updated!')),
+                );
+                _loadUserData();
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFFF57C00),
         title: const Text(
           'Settings',
           style: TextStyle(
@@ -60,33 +98,46 @@ class SettingsScreenState extends State<SettingsScreen> {
               child: CircularProgressIndicator(),
             )
           : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
               children: [
-                const SizedBox(height: 20),
-                // Profile Picture Section - LARGER
+                // Profile Picture Section
                 Center(
                   child: Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 90, // LARGER - was 60
-                        backgroundImage: _currentUser!.email == _sandovalEmail
-                            ? getImageProvider(_sandovalPfpPath)
-                            : _currentUser!.photoUrl.isNotEmpty
-                                ? NetworkImage(_currentUser!.photoUrl)
-                                : null,
-                        backgroundColor: const Color(0xFFFFE0B2),
-                        child: (_currentUser!.email == _sandovalEmail ||
-                                _currentUser!.photoUrl.isNotEmpty)
-                            ? null
-                            : Text(
-                                _currentUser!.name.isNotEmpty
-                                    ? _currentUser!.name[0].toUpperCase()
-                                    : '?',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFF57C00),
+                            width: 2,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 64,
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: ProfilePhotoHelper.getProfileImage(
+                            _currentUser!.id,
+                            userName: _currentUser!.name,
+                            photoUrl: _currentUser!.photoUrl,
+                          ),
+                          child: !ProfilePhotoHelper.hasProfilePhoto(
+                            _currentUser!.id,
+                            userName: _currentUser!.name,
+                            photoUrl: _currentUser!.photoUrl,
+                          )
+                              ? Text(
+                                  _currentUser!.name.isNotEmpty
+                                      ? _currentUser!.name[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 34,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
                       ),
                       Positioned(
                         bottom: 0,
@@ -94,23 +145,17 @@ class SettingsScreenState extends State<SettingsScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.grey[800],
+                            color: const Color(0xFFF57C00),
                             border: Border.all(
-                              color: Colors.black,
+                              color: Colors.white,
                               width: 3,
                             ),
                           ),
-                          child: IconButton(
-                            icon: const Icon(Icons.camera_alt,
-                                color: Colors.white, size: 20),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Camera feature coming soon'),
-                                  backgroundColor: Colors.grey,
-                                ),
-                              );
-                            },
+                          padding: const EdgeInsets.all(9),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
                       ),
@@ -118,138 +163,160 @@ class SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
-                // Name
                 Center(
                   child: Text(
                     _currentUser?.name ?? 'User',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
+                      color: Colors.black,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                
-                // Username/Handle
+                const SizedBox(height: 6),
                 Center(
                   child: Text(
                     '@${_currentUser?.nickname ?? _currentUser?.name.split(' ').first ?? 'user'}',
                     style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 16,
+                      color: Colors.black54,
+                      fontSize: 14,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-
-                // Settings Section 1
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildSettingTile(
-                        icon: Icons.circle,
-                        title: 'Active status',
-                        trailing: Text(
-                          _isActiveStatus ? 'On' : 'Off',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        onTap: () {
+                const SizedBox(height: 22),
+                _buildSettingsCard(
+                  children: [
+                    _buildSettingTile(
+                      icon: Icons.circle,
+                      title: 'Active status',
+                      trailing: Switch(
+                        value: _isActiveStatus,
+                        onChanged: (value) async {
                           setState(() {
-                            _isActiveStatus = !_isActiveStatus;
+                            _isActiveStatus = value;
                           });
+                          if (value) {
+                            await _chatService.setUserOnline();
+                          } else {
+                            await _chatService.setUserOffline();
+                          }
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Active status ${value ? 'enabled' : 'disabled'}',
+                              ),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
                         },
+                        activeThumbColor: const Color(0xFFF57C00),
                       ),
-                      const Divider(height: 1, color: Colors.grey),
-                      _buildSettingTile(
-                        icon: Icons.dark_mode,
-                        title: 'Dark mode',
-                        trailing: Text(
-                          _isDarkMode ? 'On' : 'Off',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        onTap: () {
+                      onTap: () {},
+                    ),
+                    _buildDivider(),
+                    _buildSettingTile(
+                      icon: Icons.notifications,
+                      title: 'Notifications & sounds',
+                      trailing: Switch(
+                        value: _notificationsEnabled,
+                        onChanged: (value) {
                           setState(() {
-                            _isDarkMode = !_isDarkMode;
+                            _notificationsEnabled = value;
                           });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Notifications ${value ? 'enabled' : 'disabled'}',
+                              ),
+                              duration: const Duration(seconds: 1),
+                            ),
+                          );
                         },
+                        activeThumbColor: const Color(0xFFF57C00),
                       ),
-                      const Divider(height: 1, color: Colors.grey),
-                      _buildSettingTile(
-                        icon: Icons.accessibility,
-                        title: 'Accessibility',
-                        onTap: () {},
-                      ),
-                      const Divider(height: 1, color: Colors.grey),
-                      _buildSettingTile(
-                        icon: Icons.privacy_tip,
-                        title: 'Privacy & safety',
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
+                      onTap: () {},
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
-
-                // Settings Section 2
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
+                _buildSettingsCard(
+                  children: [
+                    _buildSettingTile(
+                      icon: Icons.person,
+                      title: 'Avatar',
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Avatar customization coming soon'),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildDivider(),
+                    _buildSettingTile(
+                      icon: Icons.alternate_email,
+                      title: 'Username',
+                      trailing: Text(
+                        '@${_currentUser?.nickname ?? _currentUser?.name.split(' ').first ?? 'user'}',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 13,
+                        ),
+                      ),
+                      onTap: _showChangeUsernameDialog,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Logout'),
+                        content: const Text('Are you sure you want to logout?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            child: const Text('Logout'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      await FirebaseAuth.instance.signOut();
+                      if (!context.mounted) return;
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/',
+                        (route) => false,
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                  child: _buildSettingTile(
-                    icon: Icons.family_restroom,
-                    title: 'Family Center',
-                    onTap: () {},
+                  icon: const Icon(Icons.logout, color: Colors.white),
+                  label: const Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // Settings Section 3
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[900],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildSettingTile(
-                        icon: Icons.person,
-                        title: 'Avatar',
-                        onTap: () {},
-                      ),
-                      const Divider(height: 1, color: Colors.grey),
-                      _buildSettingTile(
-                        icon: Icons.alternate_email,
-                        title: 'Username',
-                        trailing: Text(
-                          '@${_currentUser?.nickname ?? _currentUser?.name.split(' ').first ?? 'user'}',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        onTap: () {},
-                      ),
-                      const Divider(height: 1, color: Colors.grey),
-                      _buildSettingTile(
-                        icon: Icons.notifications,
-                        title: 'Notifications & sounds',
-                        trailing: const Text(
-                          'On',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
               ],
             ),
     );
@@ -262,23 +329,58 @@ class SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Colors.white),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      minLeadingWidth: 40,
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFE0B2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          color: const Color(0xFFF57C00),
+          size: 20,
+        ),
+      ),
       title: Text(
         title,
         style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
+          color: Colors.black,
+          fontSize: 17,
+          fontWeight: FontWeight.w500,
         ),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailing != null) trailing,
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, color: Colors.grey),
+      trailing: trailing ??
+          const Icon(Icons.chevron_right, color: Colors.grey, size: 24),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildSettingsCard({
+    required List<Widget> children,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
-      onTap: onTap,
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Divider(height: 1, color: Colors.grey[200]),
     );
   }
 }
