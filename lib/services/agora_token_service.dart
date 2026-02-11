@@ -1,11 +1,10 @@
 import 'package:agora_token_service/agora_token_service.dart';
+import 'package:flutter_chat_ui/utils/env_config.dart';
 
 class AgoraTokenService {
-  // Your Agora App ID
-  static const String appId = '29bf12aed25044f99a211542314d7798';
-  
-  // Your Agora App Certificate
-  static const String appCertificate = 'e2cafbeff1af4d24a23888f7564059d3';
+  // Load Agora credentials from environment variables
+  static String get appId => EnvConfig.agoraAppId;
+  static String get appCertificate => EnvConfig.agoraAppCertificate;
 
   // Generate RTC token for video/audio calls
   static String generateToken({
