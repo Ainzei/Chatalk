@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_chat_ui/utils/env_config.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -43,38 +44,38 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBsuUhc3e0Qy5cNgCWRRIVI0pKdr42NEHY',
-    appId: '1:293079007321:web:c6d4b15aa715ec2217b148',
-    messagingSenderId: '293079007321',
-    projectId: 'projectim-69233',
-    authDomain: 'projectim-69233.firebaseapp.com',
-    storageBucket: 'projectim-69233.firebasestorage.app',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: EnvConfig.firebaseApiKey,
+    appId: EnvConfig.firebaseAppIdWeb,
+    messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+    projectId: EnvConfig.firebaseProjectId,
+    authDomain: EnvConfig.firebaseAuthDomain,
+    storageBucket: EnvConfig.firebaseStorageBucket,
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBsuUhc3e0Qy5cNgCWRRIVI0pKdr42NEHY',
-    appId: '1:293079007321:android:c6d4b15aa715ec2217b148',
-    messagingSenderId: '293079007321',
-    projectId: 'projectim-69233',
-    storageBucket: 'projectim-69233.firebasestorage.app',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: EnvConfig.firebaseApiKey,
+    appId: EnvConfig.firebaseAppIdAndroid,
+    messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+    projectId: EnvConfig.firebaseProjectId,
+    storageBucket: EnvConfig.firebaseStorageBucket,
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBsuUhc3e0Qy5cNgCWRRIVI0pKdr42NEHY',
-    appId: '1:293079007321:ios:c6d4b15aa715ec2217b148',
-    messagingSenderId: '293079007321',
-    projectId: 'projectim-69233',
-    storageBucket: 'projectim-69233.firebasestorage.app',
-    iosBundleId: 'com.im.chatTalk',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: EnvConfig.firebaseApiKey,
+    appId: EnvConfig.firebaseAppIdIos,
+    messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+    projectId: EnvConfig.firebaseProjectId,
+    storageBucket: EnvConfig.firebaseStorageBucket,
+    iosBundleId: EnvConfig.firebaseIosBundleId,
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBsuUhc3e0Qy5cNgCWRRIVI0pKdr42NEHY',
-    appId: '1:293079007321:macos:c6d4b15aa715ec2217b148',
-    messagingSenderId: '293079007321',
-    projectId: 'projectim-69233',
-    storageBucket: 'projectim-69233.firebasestorage.app',
-    iosBundleId: 'com.im.chatTalk',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: EnvConfig.firebaseApiKey,
+    appId: EnvConfig.firebaseAppIdMacos,
+    messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+    projectId: EnvConfig.firebaseProjectId,
+    storageBucket: EnvConfig.firebaseStorageBucket,
+    iosBundleId: EnvConfig.firebaseIosBundleId,
   );
 }
